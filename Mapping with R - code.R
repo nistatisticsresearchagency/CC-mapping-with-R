@@ -1,28 +1,31 @@
 
-# Mapping with R
-# 26/06/2025
+### Mapping with R ###
+# 22/09/2026
+# NB: tested using R 4.6.1
 
 
 ### Data, Packages and Parameters ###
 
 # Download the files that were emailed to you.
   # save them to a location you can find e.g. your Documents or Downloads folder
-  # launch the R project file: '2024-11-05 coffee and coding - mapping with R.Rproj'
+  # launch the R project file: '2026-09-22 coffee and coding - mapping with R.Rproj'
 
 
 ## Install packages
   # if you already have these packages they won't re-install
+  # ⚠ if you don't yet have these, they can take 20-30 mins to install from scratch ⚠ 
 
-MappingwithR_packages = c("sf", "tmap", "dplyr", "RColorBrewer", "kableExtra", "colorblindcheck", "plotly", "shinyjs", "cols4all")
+MappingwithR_packages = c("sf", "tmap", "dplyr", "RColorBrewer", "kableExtra", "colorblindcheck", "plotly", "shinyjs", "cols4all", "leaflet.extras")
 Packages_to_install = MappingwithR_packages[!(MappingwithR_packages %in% installed.packages()[,"Package"])]
 if(length(MappingwithR_packages)>0) install.packages(Packages_to_install)
 rm(MappingwithR_packages)
 rm(Packages_to_install)
 
-# Check tmap version
+
+# Check your tmap version
   # The tmap package has had a major update in early 2025 from v3 to v4
   # This update required changes to be made to the coffee and coding script
-  # It is important that you are running the latest version of tmap
+  # It is important that you are version 4.x of tmap
   # This next line checks your tmap version and if it is earlier than v4 it instructs R to re-install the latest version
 
 if(packageVersion("tmap") < package_version("4.1")) install.packages("tmap") else packageVersion("tmap")
@@ -35,11 +38,14 @@ library(tmap)         # for thematic mapping i.e. visualising spatial data distr
 library(dplyr)        # for manipulating data
 library(cols4all)     # for colour palettes since tmap v4
 
+# Don't worry about warning messages like "package ‘dplyr’ was built under R version 4.5.2"
+
 
 ## Load data
 
 # There should be 8 datasets in the "Environment" pane of R Studio (top-right of screen)
 # If that space is empty, run the next line to load the data
+
 load(".RData")
 
 
@@ -56,14 +62,13 @@ View(data_trees)
 
 # Currently this object is a data frame.
   # Notice that it contains coordinates.
-  # We can see that...
-  # but at the moment R does not.
+  # We can see that... but at the moment R does not know those are coordinates.
   # To map this data we need to tell R about the coordinates: 
-    # specifically we want to tell R:
-    # 1. which variables contain the coordinates
-    # 2. which 'projection' the coordinates are in
+    # specifically we want to tell R two things:
+      # 1. which variables contain the coordinates
+      # 2. which 'projection' the coordinates are in
 
-# We have a choice of coordinates: 
+# We even have a choice of coordinates: 
   # TREELOCATIONX/TREELOCATIONY 
   # also LONGITUDE/LATITUDE
   # aside: these are different types of coordinate system 
@@ -89,21 +94,21 @@ View(data_trees_sf)
 # and now each row has a geometry column: each row has a POINT(x,y)
 # NB: we now have a "simple feature" data frame
   
-# aside: I have noticed odd behaviour when analysing this data frame e.g. using dplyr's group_by
+# aside: I have seen odd behaviour when analysing this data frame e.g. using dplyr's group_by
 # I recommend having two data frames:
   # one containing just the data i.e. a data frame (for analysis)
   # and a second containing the data + geometry i.e. the sf data frame (for mapping)
 
 
+# Create a very simple map to get us started
 # Map of trees, version 1
-# create a very simple map to get us started
 map_trees_1 = tm_shape(data_trees_sf) + tm_dots()
 
 # view the map
 map_trees_1
 # this is a static image
 # we can see the outline of Belfast, and certain roads
-# we can do much better, so let's get to work with the tmap package
+# but we can do much better! let's get to work with the tmap package
 
 # Map of trees, version 2
   # resize the dots
@@ -127,9 +132,10 @@ map_trees_2 = tm_shape(data_trees_sf) +
           fill_alpha = 0.75,
           fill.scale = tm_scale_categorical(values = "light24"),
           id = "SPECIESTYPE_GROUPED",
-          popup.vars=c("TYPEOFTREE", "SPECIESTYPE_GROUPED", "SPECIESTYPE", "SPECIES", 
-                       "AGE", "DESCRIPTION", "TREESURROUND", "VIGOUR", "CONDITION",
-                       "TREEHEIGHTinMETRES", "SPREADRADIUSinMETRES", "DIAMETERinCENTIMETRES")) +
+          popup = tm_popup(vars = c("TYPEOFTREE", "SPECIESTYPE_GROUPED", "SPECIESTYPE", "SPECIES", 
+                                    "AGE", "DESCRIPTION", "TREESURROUND", "VIGOUR", "CONDITION",
+                                    "TREEHEIGHTinMETRES", "SPREADRADIUSinMETRES", "DIAMETERinCENTIMETRES"))
+          ) +
   tm_basemap(server = "Stadia.AlidadeSmoothDark") +
   tm_basemap(server = "OpenStreetMap.Mapnik") +
   tm_basemap(server = "OpenTopoMap", alpha = 0.5) +
@@ -218,13 +224,15 @@ map_schools = tm_shape(data_schools_CPD_sf) +
           fill.scale = tm_scale_categorical(values = "brewer.dark2"),
           size = 0.75,
           id = "Institution Name",
-          popup.vars = c("Institution Name", "Type",
-                       "Address Line 1", "Address Line 2", "Address Line 3", "Postcode")) +
+          popup = tm_popup(vars = c("Institution Name", "Type",
+                                    "Address Line 1", "Address Line 2", "Address Line 3", 
+                                    "Postcode"))
+  ) +
   tm_basemap(server = "OpenStreetMap.Mapnik")
 
 # launch the map
 map_schools
-
+# again you'll want to click "Show in new window" (beside the broom in the Viewer pane)
 
 # NB: There is a significant limitation of this coordinates-from-postcodes approach.
   # The coordinates are only approximate
@@ -232,12 +240,27 @@ map_schools
     # For each postcode on the POINTER dataset the average of the X and Y coordinates of constituent postcode properties is calculated. 
     # This is compared with the grid reference of the nearest property to the average 
     # and the grid reference of that property is assigned as the postcode grid-reference ‘centroid’.  
-# e.g. show Steeple Road in Antrim
-map_schools + tm_view(set_view = c(-6.21025, 54.72095, 16))
+  # e.g. show Steeple Road in Antrim
+  map_schools + tm_view(set_view = c(-6.21025, 54.72095, 16))
   # for more information about coordinates from postcodes 
   # see https://www.nisra.gov.uk/files/nisra/documents/2025-03/CPD-Guidance-Jan-2025.pdf#page=6
   # for a quick work-around to the issue of multiple schools at the same point
-    # data_schools_CPD_sf %>% st_jitter(factor = 0.00005)
+    # we can move all the points around by a small amount so that they don't overlap:
+map_schools_jittered = tm_shape(data_schools_CPD_sf %>% st_jitter(factor = 0.00005)) + 
+    tm_symbols(fill = "Type",
+               fill_alpha = 0.75,
+               fill.scale = tm_scale_categorical(values = "brewer.dark2"),
+               size = 0.75,
+               id = "Institution Name",
+               popup = tm_popup(vars = c("Institution Name", "Type",
+                                         "Address Line 1", "Address Line 2", "Address Line 3", 
+                                         "Postcode"))
+    ) +
+    tm_basemap(server = "OpenStreetMap.Mapnik")
+
+map_schools_jittered + tm_view(set_view = c(-6.21025, 54.72095, 20))
+# now the 3 overlapping points from before can be seen side-by-side
+# and hovered or clicked separately
 
 # End of Part 2.
 
@@ -271,7 +294,7 @@ View(data_survey)
   # notice we don't have any coordinates 👎
   # but we do have UPRN 👍
 
-# So we have two datasets: 
+# In this scenario we have two datasets: 
   # one for our made-up survey, and 
   # one containing a sample from Pointer
 
@@ -291,8 +314,8 @@ View(data_survey_PTR)
 data_survey_PTR_sf <- data_survey_PTR %>%
   st_as_sf(coords = c("X_COR", "Y_COR"), crs = 29903)
 # recall: 
-# this tells R which variables contain the coordinates i.e. X_COR and Y_COR
-# and that they are Irish Grid coordinates (crs = 29903)
+  # this tells R which variables contain the coordinates i.e. X_COR and Y_COR
+  # and that they are Irish Grid coordinates (crs = 29903)
   
 # Create map
 map_survey = tm_shape(data_survey_PTR_sf) + 
@@ -300,12 +323,16 @@ map_survey = tm_shape(data_survey_PTR_sf) +
           fill.scale = tm_scale_categorical(values = "brewer.accent"),
           size = 1,
           id = "UPRN",
-          popup.vars = c("UPRN", "QUESTIONNAIRE", "CLASSIFICATION", "BUILDING_NUMBER", "PRIMARY_THORFARE", "POSTCODE"),
-          popup.format=list("UPRN" = list(fun=function(x) formatC(x, digits=0, format="d")))) +
+          popup = tm_popup(vars = c("UPRN", "QUESTIONNAIRE", "CLASSIFICATION", "BUILDING_NUMBER", "PRIMARY_THORFARE", "POSTCODE"),
+                           format = list("UPRN" = list(fun=function(x) formatC(x, digits=0, format="d")))
+                           )
+          )+
           tm_basemap(server = "OpenStreetMap.Mapnik", alpha = 0.5)
+
 
 # launch the map
 map_survey
+# remember to "show in new window"
   
 # Note:
   # geographic area = part of Coleraine
@@ -335,7 +362,6 @@ map_survey
   # where they had been uploaded by Land and Property Services (LPS)
 
 # In NISRA we are licensed to use these shapefiles under the NI Mapping Agreement (NIMA)
-
 
 # Create a map showing the 26 council boundaries
 map_LGD1993 = tm_shape(data_LGD1993_boundary) + 
@@ -373,21 +399,21 @@ map_schools_LGDs
 
 # Extra #2: choropleth maps 
   # i.e. colour the council areas based on some statistic
-  # we will use population data for 2023
+  # we will use population data for 2024
 
 # inspect the population data
-View(data_population_LGD_2023)
+View(data_population_LGD_2024)
 
 # inspect the boundary data
 View(data_LGD2012_boundary)
 
 # Join the 11 council boundaries with the population data
-data_LGD2012_boundary_pop2023 = left_join(data_LGD2012_boundary, 
-                                          data_population_LGD_2023, 
+data_LGD2012_boundary_pop2024 = left_join(data_LGD2012_boundary, 
+                                          data_population_LGD_2024, 
                                           by = join_by(LGDCode == area_code))
 
 # Inspect
-View(data_LGD2012_boundary_pop2023)
+View(data_LGD2012_boundary_pop2024)
 # We have the councils (codes + names)
   # and populations
   # and geometries, in this case POLYGONS rather than POINTS
@@ -399,9 +425,9 @@ cols4all::c4a_gui()
 # remember to close the R Shiny cols4all pop-up when you're finished with it - it will prevent your maps from loading
 
 
-# create a choropleth map showing NI population in 2023 by 11 councils
-map_pop2023 = tm_shape(data_LGD2012_boundary_pop2023) + 
-  tm_polygons(fill = "mye", 
+# create a choropleth map showing NI population in 2024 by 11 councils
+map_pop2024 = tm_shape(data_LGD2012_boundary_pop2024) + 
+  tm_polygons(fill = "MYE", 
               fill_alpha = 0.75, 
               fill.scale = tm_scale(values = "brewer.greens", 
                                     breaks = c(100000, 150000, 200000, 250000, 300000, 350000, 400000)
@@ -409,22 +435,86 @@ map_pop2023 = tm_shape(data_LGD2012_boundary_pop2023) +
               )
 
 # launch the map
-map_pop2023
+map_pop2024
 
 # these maps also work quite well as plots / static maps
 tmap_mode("plot") 
 # this switches tmap back to 'static' mode rather than 'interactive'
 
 # view our last map as a static map
-map_pop2023
+map_pop2024
 
-# This is very basic and could be used for internal QA 
-# but wouldn't be anywhere close to publication quality.
-# In my recent experience, when creating a static map for a publication
-  # I have used QGIS software (not in IT Assist Store but available on request)
+# This is very basic and could be used for quick internal QA 
+# but is definitely not publication quality.
+# In my recent-ish experience, when I needed a static map for a publication
+  # I used QGIS software (not in IT Assist Store but available on request)
   # which provides a point-and-click interface
   # and gives you fine control over labelling, copyright note, scale bar
   # part of the battle is also sourcing all the different boundaries e.g. loughs, RoI
+
+
+
+# Extra #3: Adding a search box
+
+# ⚠️NB: I've noticed this stops working with R 4.6.1 ⚠️
+# I haven't found a solution yet, other than using R 4.5.1
+
+# A colleague asked if it would be difficult to add a placename search box
+# This isn't supported by the tmap package but the leaflet package can do this
+
+
+#install.packages("leaflet")
+#install.packages("leaflet.extras")
+
+library(leaflet)
+library(leaflet.extras)
+
+# let's recreate our tree map with a search box
+map_trees_2 %>% 
+  tmap_leaflet() %>% 
+  leaflet.extras::addSearchOSM()
+# we now have a magnifying glass on the map
+# the trick is to type your place name and wait a second for it to search
+# then select it from the drop-down
+# note: this is better with settlements, streets and buildings
+  # but not great with postcodes
+  # and doesn't know anything about our LGDs, wards, DZs etc
+
+# let's try it again but with our schools map instead
+map_schools %>% 
+  tmap_leaflet() %>% 
+  leaflet.extras::addSearchOSM()
+# this code takes our existing map
+  # converts it from tmap-format to leaflet-format (different mapping package)
+  # then adds an Open Street Map (OSM) search box
+  # there's also a Google Maps option but you would need to register for a Google API
+
+
+# Extra #4: heatmaps
+
+library(leaflet)
+
+# tmap used to be able to do heatmaps easily
+# but the new version 4 seems to have dropped this functionality!
+
+# Let's make a quick heatmap of trees in Belfast using the leaflet package instead
+# The data_trees table happens to have lat/long coordinates already
+
+leaflet(data_trees) %>%
+  addTiles() %>%
+  addHeatmap(lng = ~LONGITUDE, 
+             lat = ~LATITUDE, 
+             intensity = 1,
+             radius = 10, 
+             blur = 20, 
+             max = 1)
+
+# and we can consult the help file and tinker with the parameters
+# this works because the table contains lat/long coordinates
+# but unfortunately this doesn't work with Irish Grid coordinates
+# it's relatively simple to recode lat/long into Irish Grid
+# it's too much information for this session 
+# but get in touch if you're trying to do this as I have some code.
 
 
 # End of Part 4.
@@ -435,7 +525,7 @@ map_pop2023
 
 # NISRA-specific map template
   # RAP Skeleton 2.1 on NISRA's MS Teams page
-  # https://nicsonline.sharepoint.com/sites/TM-DOF-NISRATEAM/SitePages/RAP-Skeleton.aspx?csf=1&web=1&share=EaPCdG_kz-ZHit6dfkRmzpQB0i5ix5aHxUI3Z29zgw-ShA&e=6cs1ap&CID=ae67f855-357a-4270-afb8-47aec745fdbe
+  # https://nicsonline.sharepoint.com/sites/TM-DOF-NISRATEAM/SitePages/RAP-Skeleton.aspx
   # https://github.com/NISRA-Tech-Lab/rap-skeleton
 
 # Additional background maps (browse)
@@ -449,6 +539,11 @@ map_pop2023
 # Finding Coordinate Reference System codes
   # https://epsg.io/
   
+# NISRA Boundaries Application on Spatial NI
+  # This is useful for browsing boundary codes and names in your browser
+  # and seeing how different boundaries overlap
+  # https://apps.spatialni.gov.uk/NISRABoundariesApplication/
+
 # More on tmap
   # https://github.com/r-tmap/tmap
   # https://r-tmap.github.io/tmap/index.html
@@ -467,5 +562,10 @@ map_pop2023
   # Pointer (sample) https://www.nidirect.gov.uk/publications/pointer-sample-data
   # Boundary for 26 councils https://admin.opendatani.gov.uk/dataset/osni-open-data-50k-boundaries-local-government-districts-1993
   # Boundary for 11 councils https://admin.opendatani.gov.uk/dataset/osni-open-data-largescale-boundaries-local-government-districts-2012
-  # Mid Year Population Estimates 2023 https://www.nisra.gov.uk/publications/2023-mid-year-population-estimates-northern-ireland-and-estimates-population-aged-85
+  # Mid Year Population Estimates 2024 https://www.nisra.gov.uk/publications/2024-mid-year-population-estimates-northern-ireland-and-estimates-population-aged-85
 
+# Adding a search box
+  # https://forum.posit.co/t/how-to-add-search-box-on-tmap-leaflet-linked-to-google-street-map-using-r/67741/2
+
+# Relevant UK context
+  # GSS Geography Policy on Analysis Function: https://analysisfunction.civilservice.gov.uk/policy-store/gss-geography-policy/
